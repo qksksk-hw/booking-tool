@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>부킹 메일 → 엑셀 붙여넣기용</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--bg:#f6f7f9;--card:#fff;--tx:#1b2430;--mu:#6b7686;--bd:#d9dee6;--ac:#1f6feb;--hd:#1f4e78;--dg:#c62828}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12161c;--card:#1b222b;--tx:#e6ebf2;--mu:#93a0b2;--bd:#2d3744;--ac:#5b9bff;--hd:#2c5d8a;--dg:#ff7b72}}
+:root[data-theme="dark"]{--bg:#12161c;--card:#1b222b;--tx:#e6ebf2;--mu:#93a0b2;--bd:#2d3744;--ac:#5b9bff;--hd:#2c5d8a;--dg:#ff7b72}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 -apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif}
+main{max-width:1000px;margin:0 auto;padding:16px}
+h1{font-size:20px;margin:4px 0 2px}
+p.sub{color:var(--mu);margin:0 0 14px;font-size:13px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px;margin-bottom:14px}
+textarea{width:100%;min-height:160px;border:1px solid var(--bd);border-radius:8px;padding:10px;background:var(--bg);color:var(--tx);font:13px/1.5 ui-monospace,Menlo,Consolas,monospace;resize:vertical}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center}
+button,select{border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:8px;padding:9px 14px;font:inherit;font-size:14px;cursor:pointer}
+button.p{background:var(--ac);border-color:var(--ac);color:#fff}
+button.d{color:var(--dg)}
+button:disabled{opacity:.45}
+label{font-size:13px;color:var(--mu)}
+.wrap{overflow-x:auto;border:1px solid var(--bd);border-radius:8px}
+table{border-collapse:collapse;width:max-content;min-width:100%}
+th{background:var(--hd);color:#fff;font-size:12px;padding:7px 8px;white-space:nowrap;text-align:left}
+td{border-top:1px solid var(--bd);padding:0}
+td input{border:0;background:transparent;color:var(--tx);font:inherit;font-size:13px;padding:7px 8px;width:105px}
+td.w input{width:200px}
+td.l input{width:340px}
+td.x{padding:0 4px;white-space:nowrap}
+td.x button{padding:4px 9px;font-size:13px}
+.empty{color:var(--mu);text-align:center;padding:22px;font-size:13px}
+#msg{color:var(--mu);font-size:13px;margin-top:8px;min-height:18px}
+.hint{font-size:12px;color:var(--mu);margin-top:6px}
+</style>
+</head>
+<body>
+<main>
+<h1>부킹 메일 → 엑셀 붙여넣기용</h1>
+<p class="sub">포워더 메일 본문을 붙여넣으면 BKG별로 한 줄씩 만들어줘요.</p>
+
+<div class="card">
+<textarea id="src" placeholder="메일 본문 붙여넣기&#10;&#10;JASPER 9E&#10;BKG:&#10;-EBKG18969739 /5T&#10;SI0000003965/SI0000003983&#10;CARRIER:MSC&#10;PORT:SAVANNAH&#10;..."></textarea>
+<div class="row">
+<button class="p" id="add">표 만들기</button>
+<button id="clr">입력 지우기</button>
+</div>
+<div class="hint">메일의 표를 그대로 복사해서 붙여넣어도 돼요. 여러 통을 한꺼번에 넣을 땐 메일 사이에 <b>---</b> 한 줄을 넣어주세요.</div>
+<div id="msg"></div>
+</div>
+
+<div class="card">
+<div class="row" style="margin-top:0">
+<label>CLS 칸에 넣을 값</label>
+<select id="mode"><option value="doc">DOC CLS</option><option value="cgo">CGO CLS</option></select>
+<label><input type="checkbox" id="hdr"> 복사할 때 제목줄 포함</label>
+</div>
+<div class="wrap" style="margin-top:10px"><table><thead id="hd"></thead><tbody id="bd"></tbody></table></div>
+<div class="row">
+<button class="p" id="cp" disabled>전체 복사</button>
+<button id="xl" disabled>엑셀(.xlsx) 저장</button>
+<button class="d" id="all" disabled>전체 삭제</button>
+</div>
+<div class="hint">줄마다 있는 <b>복사</b> 버튼을 누르고 엑셀에 붙여넣으면 한 줄씩 들어가요.</div>
+</div>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+var COLS = [["BKG#","bkg"],["PORT","port"],["LINE","line"],["CLS","CLS"],["ETD","etd"],["ETA","eta"],["CNTR","cntr"],["VESSEL","vessel"]];
+var ALIAS = {
+  BKG:["BKG NO","BKG","BOOKING NO","BOOKING"],
+  CARRIER:["CARRIER","선사"],
+  PORT:["PORT"],
+  VESSEL:["VESSEL","VSL"],
+  VOLUME:["VOLUME","VOL"],
+  ETD:["ETD"], ETA:["ETA"],
+  DOC:["DOC CLS","DOC CLOSING","DOC CLOSE"],
+  CGO:["CGO CLS","CARGO CLS","CARGO CLOSING","CGO CLOSE"]
+};
+var norm = function(s){return s.replace(/\s+/g,"").toUpperCase();};
+var list = [], lookup = {};
+Object.keys(ALIAS).forEach(function(c){ALIAS[c].forEach(function(a){list.push(a);lookup[norm(a)]=c;});});
+list.sort(function(a,b){return b.length-a.length;});
+var names = list.map(function(a){return a.replace(/[.*+?^${}()|[\]\\]/g,"\\$&").replace(/ /g,"\\s*");}).join("|");
+var RE = new RegExp("(?<![A-Za-z0-9가-힣])("+names+")[ \\t]*(?:[:：=]|\\t|\\r?\\n)[ \\t]*","gi");
+var BUL = /^[-•*·\s]+/;
+
+function parse(t){
+  var ms = [], m, f = {};
+  RE.lastIndex = 0;
+  while((m = RE.exec(t))) ms.push({c:lookup[norm(m[1])],s:m.index,e:RE.lastIndex});
+  ms.forEach(function(x,i){
+    if(x.c==="BKG" || f[x.c]) return;
+    var end = i+1<ms.length ? ms[i+1].s : t.length;
+    var v = t.slice(x.e,end).split(/\r?\n/)[0].replace(/[\s,;|]+$/,"").trim();
+    if(v) f[x.c] = v;
+  });
+  var bks = [], bi = -1;
+  ms.some(function(x,i){ if(x.c==="BKG"){bi=i;return true;} });
+  if(bi>=0){
+    var nx = ms.slice(bi+1).filter(function(x){return x.c!=="BKG";})[0];
+    var blk = t.slice(ms[bi].e, nx ? nx.s : t.length), cur = null;
+    blk.split(/\r?\n/).forEach(function(ln){
+      ln = ln.trim(); if(!ln) return;
+      var mm = ln.match(/^[-•*·\s]*(.+?)\s*\/\s*(\d+)\s*T\s*$/i);
+      if(mm){ cur = {bkg:mm[1].trim(),n:mm[2],po:[]}; bks.push(cur); }
+      else if(cur){ cur.po.push(ln.replace(BUL,"")); }
+      else { cur = {bkg:ln.replace(BUL,""),n:"",po:[]}; bks.push(cur); }
+    });
+  }
+  if(!bks.length){ if(!Object.keys(f).length) return []; bks.push({bkg:"",n:"",po:[]}); }
+  var vt = (f.VOLUME||"").replace(/\s*[xX×]\s*\d+\s*$/,"").trim();
+  return bks.map(function(b){
+    return {bkg:b.bkg, port:f.PORT||"", line:f.CARRIER||"", doc:f.DOC||"", cgo:f.CGO||"",
+      etd:f.ETD||"", eta:f.ETA||"",
+      cntr: b.n ? (vt ? vt+" X "+b.n : b.n) : (f.VOLUME||""),
+      vessel:f.VESSEL||"", po:b.po.join("/").split("/").map(function(s){return s.trim();}).filter(Boolean)};
+  });
+}
+
+var rows = [];
+var $ = function(id){return document.getElementById(id);};
+var mode = function(){return $("mode").value;};
+var get = function(r,k){return k==="CLS" ? (r[mode()]||"") : (r[k]||"");};
+var rowArr = function(r){return COLS.map(function(c){return get(r,c[1]);}).concat(r.po);};
+var poCount = function(){return Math.max.apply(null,[1].concat(rows.map(function(r){return r.po.length;})));};
+var heads = function(){var h = COLS.map(function(c){return c[0];}); h.push("SHAW PO"); for(var i=2;i<=poCount();i++) h.push("PO "+i); return h;};
+
+function copyText(txt, okMsg){
+  var ok = function(){ $("msg").textContent = okMsg; };
+  var fb = function(){
+    var ta = document.createElement("textarea"); ta.value = txt; ta.style.position="fixed"; ta.style.opacity="0";
+    document.body.appendChild(ta); ta.select();
+    var r = false; try{ r = document.execCommand("copy"); }catch(e){}
+    document.body.removeChild(ta);
+    $("msg").textContent = r ? okMsg : "복사가 막혀 있어요. 엑셀 저장을 이용해주세요.";
+  };
+  try{ navigator.clipboard.writeText(txt).then(ok, fb); }catch(e){ fb(); }
+}
+function tsv(arr){
+  var head = $("hdr").checked ? [heads().join("\t")] : [];
+  return head.concat(arr.map(function(r){return rowArr(r).join("\t");})).join("\n");
+}
+
+function render(){
+  $("hd").innerHTML = "<tr><th></th>"+heads().map(function(h){return "<th>"+h+"</th>";}).join("")+"</tr>";
+  var b = $("bd"); b.innerHTML = "";
+  if(!rows.length) b.innerHTML = '<tr><td class="empty" colspan="'+(COLS.length+1)+'">아직 만들어진 줄이 없어요</td></tr>';
+  rows.forEach(function(r,i){
+    var tr = document.createElement("tr");
+    var x = document.createElement("td"); x.className = "x";
+    var cb = document.createElement("button"); cb.textContent = "복사"; cb.className = "p";
+    cb.onclick = function(){ copyText(tsv([r]), (i+1)+"번째 줄 복사됨 — 엑셀에 붙여넣기 하세요."); };
+    var del = document.createElement("button"); del.textContent = "✕"; del.className = "d";
+    del.onclick = function(){ rows.splice(i,1); render(); };
+    x.appendChild(cb); x.appendChild(document.createTextNode(" ")); x.appendChild(del); tr.appendChild(x);
+    COLS.forEach(function(c){
+      var td = document.createElement("td");
+      if(c[1]==="vessel"||c[1]==="CLS") td.className = "w";
+      if(c[1]==="po") td.className = "l";
+      var inp = document.createElement("input"); inp.value = get(r,c[1]);
+      inp.oninput = function(){ r[c[1]==="CLS" ? mode() : c[1]] = inp.value; };
+      td.appendChild(inp); tr.appendChild(td);
+    });
+    for(var j=0;j<poCount();j++){ (function(j){
+      var td = document.createElement("td"), inp = document.createElement("input");
+      inp.value = r.po[j]||""; inp.style.width = "150px";
+      inp.oninput = function(){ r.po[j] = inp.value; };
+      td.appendChild(inp); tr.appendChild(td);
+    })(j); }
+    b.appendChild(tr);
+  });
+  ["cp","xl","all"].forEach(function(id){$(id).disabled = !rows.length;});
+}
+
+function htmlToText(html){
+  var d = new DOMParser().parseFromString(html,"text/html");
+  Array.prototype.forEach.call(d.querySelectorAll("br"),function(b){b.replaceWith("\n");});
+  Array.prototype.forEach.call(d.querySelectorAll("p,div,li"),function(p){p.append("\n");});
+  var clean = function(s){return s.replace(/\u00a0/g," ").split(/\r?\n/).map(function(x){return x.trim();}).filter(Boolean).join("\n");};
+  Array.prototype.forEach.call(d.querySelectorAll("table"),function(tb){
+    if(!tb.isConnected || tb.querySelector("table")) return;
+    var lines = Array.prototype.map.call(tb.querySelectorAll("tr"),function(tr){
+      return Array.prototype.map.call(tr.children,function(c){return clean(c.textContent);}).join("\t");
+    });
+    tb.replaceWith("\n"+lines.join("\n")+"\n");
+  });
+  return clean(d.body.textContent);
+}
+$("src").addEventListener("paste",function(e){
+  var cd = e.clipboardData, html = cd && cd.getData("text/html");
+  if(!html || !/<table/i.test(html)) return;
+  e.preventDefault();
+  var txt = htmlToText(html), ta = $("src"), s = ta.selectionStart;
+  ta.value = ta.value.slice(0,s)+txt+ta.value.slice(ta.selectionEnd);
+  ta.selectionStart = ta.selectionEnd = s+txt.length;
+});
+$("mode").onchange = render;
+$("add").onclick = function(){
+  var t = $("src").value.trim();
+  if(!t){ $("msg").textContent = "메일 본문을 먼저 붙여넣어 주세요."; return; }
+  var n = 0, miss = 0;
+  t.split(/^\s*-{3,}\s*$/m).map(function(s){return s.trim();}).filter(Boolean).forEach(function(mt){
+    var rs = parse(mt);
+    if(rs.length){ rows = rows.concat(rs); n += rs.length; } else miss++;
+  });
+  render();
+  $("msg").textContent = n+"줄 추가됨" + (miss ? " · 항목을 찾지 못한 메일 "+miss+"건 (항목명 뒤에 : 가 있는지 확인)" : "");
+  if(n) $("src").value = "";
+};
+$("clr").onclick = function(){ $("src").value=""; $("msg").textContent=""; };
+$("all").onclick = function(){ if(confirm("표의 내용을 모두 지울까요?")){ rows = []; render(); } };
+$("cp").onclick = function(){ copyText(tsv(rows), "전체 복사됨 — 엑셀에 붙여넣기 하세요."); };
+$("xl").onclick = function(){
+  var d = new Date(), stamp = d.getFullYear()+("0"+(d.getMonth()+1)).slice(-2)+("0"+d.getDate()).slice(-2);
+  var aoa = [heads()].concat(rows.map(rowArr));
+  var blob, name;
+  if(window.XLSX){
+    var ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws["!cols"] = aoa[0].map(function(){return {wch:16};});
+    var wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "부킹");
+    blob = new Blob([XLSX.write(wb,{type:"array",bookType:"xlsx"})],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+    name = "부킹정리_"+stamp+".xlsx";
+  } else {
+    var csv = "\ufeff"+aoa.map(function(r){return r.map(function(c){return '"'+String(c).replace(/"/g,'""')+'"';}).join(",");}).join("\r\n");
+    blob = new Blob([csv],{type:"text/csv"}); name = "부킹정리_"+stamp+".csv";
+  }
+  var a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function(){URL.revokeObjectURL(a.href);},1000);
+  $("msg").textContent = "저장 완료 ("+name+")";
+};
+render();
+</script>
+</body>
+</html>
